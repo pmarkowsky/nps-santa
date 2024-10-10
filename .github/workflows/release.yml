@@ -1,0 +1,73 @@
+
+name: Build, Sign, and Push a Release to GitHub
+on:
+  workflow_dispatch:  # Allows you to run this workflow manually from the Actions tab
+    inputs:
+      release_tag:
+        description: 'A valid, tagged Santa release'
+        required: true
+        default: ''
+      upload_github:
+        description: 'Upload artifacts to GitHub ("no" is dry run)'
+        required: false
+        type: choice
+        options: [ "yes", "no" ]
+        default: "yes"
+
+jobs:
+  Release:
+    runs-on: macos-15
+    steps:
+      - name: Summary
+        run: | 
+          echo "Tag: ${{ github.event.inputs.release_tag }}"
+      - name: Clone Santa repo
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
+      - name: Setup Keychain
+        env:
+          KEYCHAIN_TEMP_DIR: keychain-${{ github.run_id }}-${{ github.run_number }}
+        run: |
+          KEYCHAIN_FILE=$(mktemp -d $KEYCHAIN_TEMP_DIR)/santa_build.keychain
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 18)
+
+          security create-keychain -p $KEYCHAIN_PASSWORD $KEYCHAIN_FILE
+          security default-keychain -s $KEYCHAIN_FILE
+          security unlock-keychain -p $KEYCHAIN_PASSWORD $KEYCHAIN_FILE
+
+          # Add the application identity. This is used to sign binaries
+          echo ${{ secrets.APPLE_CODESIGNING_APPLICATION_ZMCG7MLDV9_P12_BASE64 }} | base64 --decode > application.p12
+          security import application.p12 -k $KEYCHAIN_FILE -P "${{ secrets.APPLE_CODESIGNING_APPLICATION_ZMCG7MLDV9_P12_PASSWORD }}" -T /usr/bin/codesign;
+
+          # Add the installer identity. This is used to sign packages
+          echo ${{ secrets.APPLE_CODESIGNING_INSTALLER_ZMCG7MLDV9_P12_BASE64 }} | base64 --decode > installer.p12
+          security import installer.p12 -k $KEYCHAIN_FILE -P "${{ secrets.APPLE_CODESIGNING_INSTALLER_ZMCG7MLDV9_P12_PASSWORD }}" -T /usr/bin/productsign;
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign:,productsign: -s -k $KEYCHAIN_PASSWORD $KEYCHAIN_FILE
+
+          rm -rf *.p12
+
+          security find-identity -v
+      - name: Build Userspace
+        run: bazel build --apple_generate_dsym -c opt //:release
+      - name: Run Packaging tools
+        env:
+          RELEASE_ROOT: ./bazel-bin
+          ARTIFACTS_DIR: /tmp
+          SIGNING_IDENTITY: YYY
+          SIGNING_TEAMID: ZZZ
+          SIGNING_KEYCHAIN: /tmp/
+          INSTALLER_SIGNING_IDENTITY: jjj
+          INSTALLER_SIGNING_KEYCHAIN: kkk
+          NOTARIZATION_TOOL: jjj
+        run: |
+          ./Conf/Package/package_and_sign.sh
+      - name: Upload the packages to GitHub
+        if: github.event.inputs.upload_github == 'yes'
+        env:
+          GITHUB_TOKEN: ${{secrets.OSQUERY_RELEASE_ARTIFACTS_PAT}} 
+        working-directory: ${{ steps.build_paths.outputs.BINARY }}
+        shell: bash
+        run: |
+          gh release upload --repo northpolesec/santa ${{ github.event.inputs.release_tag }} ${{ github.event.inputs.clobber == 'yes' && '--clobber' || '' }} *.pkg *tar.gz
+        
+
