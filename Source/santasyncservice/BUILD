@@ -55,7 +55,7 @@ objc_library(
     ],
     hdrs = ["SNTSyncManager.h"],
     sdk_dylibs = ["libz"],
-    sdk_frameworks = ["Network"],
+    sdk_frameworks = ["AppKit", "Network"],
     deps = [
         ":FCM_lib",
         ":broadcaster_lib",
@@ -112,6 +112,7 @@ santa_unit_test(
         "testdata/*.plist",
     ]),
     sdk_dylibs = ["libz"],
+    sdk_frameworks = ["AppKit"],
     deps = [
         ":FCM_lib",
         ":broadcaster_lib",
@@ -176,6 +177,11 @@ objc_library(
     ],
 )
 
+filegroup(
+    name = "santasyncservice_entitlements",
+    srcs = ["santasyncservice.entitlements"],
+)
+
 macos_command_line_application(
     name = "santasyncservice",
     bundle_id = "com.northpolesec.santa.syncservice",
@@ -183,6 +189,7 @@ macos_command_line_application(
         "--timestamp",
         "--force",
         "--options library,kill,runtime",
+        "--entitlements ./Source/santasyncservice/santasyncservice.entitlements",
     ],
     infoplists = ["Info.plist"],
     minimum_os_version = "12.0",
@@ -192,7 +199,7 @@ macos_command_line_application(
     }),
     version = "//:version",
     visibility = ["//:santa_package_group"],
-    deps = [":santass_lib"],
+    deps = [":santass_lib", ":santasyncservice_entitlements"],
 )
 
 test_suite(

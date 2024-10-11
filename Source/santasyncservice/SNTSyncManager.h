@@ -69,6 +69,6 @@
 - (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events fromBundle:(BOOL)isFromBundle;
 - (void)postBundleEventToSyncServer:(SNTStoredEvent *)event
                               reply:(void (^)(SNTBundleEventAction))reply;
-- (void)isFCMListening:(void (^)(BOOL))reply;
+- (void)isFCMOrAPNSListening:(void (^)(BOOL))reply;
 
 @end

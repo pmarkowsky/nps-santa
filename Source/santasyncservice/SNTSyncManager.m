@@ -141,7 +141,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   self.xsrfTokenHeader = syncState.xsrfTokenHeader;
 }
 
-- (void)isFCMListening:(void (^)(BOOL))reply {
+- (void)isFCMorAPNSListening:(void (^)(BOOL))reply {
   reply(self.pushNotifications.isConnected);
 }
 

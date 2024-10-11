@@ -625,6 +625,11 @@
 @property(readonly, nonatomic) BOOL fcmEnabled;
 
 ///
+/// If true, Santa will listen for APNS notifications to trigger syncs.
+///
+@property(readonly, nonatomic) BOOL apnsEnabled;
+
+///
 /// True if metricsFormat and metricsURL are set. False otherwise.
 ///
 @property(readonly, nonatomic) BOOL exportMetrics;

@@ -22,5 +22,7 @@
 	<string>${SANTA_VERSION}</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>North Pole Security, Inc.</string>
+	<key>LSUIElement</key>
+    <true/>
 </dict>
 </plist>

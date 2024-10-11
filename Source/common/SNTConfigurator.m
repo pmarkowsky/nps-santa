@@ -137,6 +137,7 @@ static NSString *const kClientContentEncoding = @"SyncClientContentEncoding";
 static NSString *const kFCMProject = @"FCMProject";
 static NSString *const kFCMEntity = @"FCMEntity";
 static NSString *const kFCMAPIKey = @"FCMAPIKey";
+static NSString *const kEnableAPNS = @"EnableAPNS";
 
 static NSString *const kEntitlementsPrefixFilterKey = @"EntitlementsPrefixFilter";
 static NSString *const kEntitlementsTeamIDFilterKey = @"EntitlementsTeamIDFilter";
@@ -271,6 +272,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kFCMProject : string,
       kFCMEntity : string,
       kFCMAPIKey : string,
+      kEnableAPNS : number,
       kMetricFormat : string,
       kMetricURL : string,
       kMetricExportInterval : number,
@@ -1043,6 +1045,11 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 
 - (BOOL)fcmEnabled {
   return (self.fcmProject.length && self.fcmEntity.length && self.fcmAPIKey.length);
+}
+
+- (BOOL)apnsEnabled {
+  NSNumber *number = self.configState[kEnableAPNS];
+  return number ? [number boolValue] : NO;
 }
 
 - (void)setBlockUSBMount:(BOOL)enabled {
