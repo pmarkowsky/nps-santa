@@ -14,6 +14,7 @@
 ///    limitations under the License.
 
 #import <Foundation/Foundation.h>
+#include "Source/common/SNTCommonEnums.h"
 #import <objc/runtime.h>
 
 #import "Source/common/MOLCertificate.h"
@@ -420,6 +421,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
         .signingID = signingID,
         .certificateSHA256 = err ? nil : csc.leafCertificate.SHA256,
         .teamID = teamID,
+        .processName = fileInfo.path.lastPathComponent
     };
 
     [[cmd.daemonConn remoteObjectProxy]
@@ -450,6 +452,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
         case SNTEventStateBlockSigningID: [output appendString:@" (SigningID)"]; break;
         case SNTEventStateAllowCDHash:
         case SNTEventStateBlockCDHash: [output appendString:@" (CDHash)"]; break;
+        case SNTEventStateAllowProcessName:
+        case SNTEventStateBlockProcessName: [output appendString:@" (Process Name)"]; break;
         case SNTEventStateAllowScope:
         case SNTEventStateBlockScope: [output appendString:@" (Scope)"]; break;
         case SNTEventStateAllowCompilerBinary: [output appendString:@" (Compiler, Binary)"]; break;

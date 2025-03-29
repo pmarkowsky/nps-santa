@@ -26,6 +26,7 @@
     _signingID = identifiers.signingID;
     _certificateSHA256 = identifiers.certificateSHA256;
     _teamID = identifiers.teamID;
+    _processName = identifiers.processName; 
   }
   return self;
 }
@@ -35,7 +36,8 @@
                                   .binarySHA256 = self.binarySHA256,
                                   .signingID = self.signingID,
                                   .certificateSHA256 = self.certificateSHA256,
-                                  .teamID = self.teamID};
+                                  .teamID = self.teamID,
+                                  .processName = self.processName}; 
 }
 
 #pragma mark NSSecureCoding
@@ -52,6 +54,7 @@
     DECODE(decoder, signingID, NSString);
     DECODE(decoder, certificateSHA256, NSString);
     DECODE(decoder, teamID, NSString);
+    DECODE(decoder, processName, NSString);
   }
   return self;
 }
@@ -62,6 +65,7 @@
   ENCODE(coder, signingID);
   ENCODE(coder, certificateSHA256);
   ENCODE(coder, teamID);
+  ENCODE(coder, processName);
 }
 
 @end

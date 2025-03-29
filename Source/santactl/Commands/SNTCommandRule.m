@@ -14,6 +14,7 @@
 ///    limitations under the License.
 
 #import <CommonCrypto/CommonDigest.h>
+#include "Source/common/SNTCommonEnums.h"
 #import <Foundation/Foundation.h>
 #import <Kernel/kern/cs_blobs.h>
 
@@ -65,7 +66,7 @@ REGISTER_COMMAND_NAME(@"rule")
           @"                   Defaults to a SHA-256 rule unless overridden with another flag.\n"
           @"                   Does not work with --check. Use the fileinfo verb to check.\n"
           @"                   the rule state of a file.\n"
-          @"    --identifier {sha256|teamID|signingID|cdhash}: identifier to add/remove/check\n"
+          @"    --identifier {sha256|teamID|signingID|cdhash|process name}: identifier to add/remove/check\n"
           @"    --sha256 {sha256}: hash to add/remove/check [deprecated]\n"
           @"\n"
           @"  Optionally:\n"
@@ -73,6 +74,7 @@ REGISTER_COMMAND_NAME(@"rule")
           @"    --signingid: add or check a signing ID rule instead of binary (see notes)\n"
           @"    --certificate: add or check a certificate sha256 rule instead of binary\n"
           @"    --cdhash: add or check a cdhash rule instead of binary\n"
+          @"    --processname: add or check a process name rule instead of binary\n"
 #ifdef DEBUG
           @"    --force: allow manual changes even when SyncBaseUrl is set\n"
 #endif
@@ -164,6 +166,10 @@ REGISTER_COMMAND_NAME(@"rule")
       newRule.type = SNTRuleTypeSigningID;
     } else if ([arg caseInsensitiveCompare:@"--cdhash"] == NSOrderedSame) {
       newRule.type = SNTRuleTypeCDHash;
+    } else if ([arg caseInsensitiveCompare:@"--processname"] == NSOrderedSame) {
+      newRule.type = SNTRuleTypeProcessName;
+    } else if ([arg caseInsensitiveCompare:@"--binary"] == NSOrderedSame) {
+      newRule.type = SNTRuleTypeBinary;
     } else if ([arg caseInsensitiveCompare:@"--path"] == NSOrderedSame) {
       if (++i > arguments.count - 1) {
         [self printErrorUsageAndExit:@"--path requires an argument"];
@@ -343,6 +349,10 @@ REGISTER_COMMAND_NAME(@"rule")
                            case SNTRuleTypeCDHash: {
                              ruleType = @"CDHash";
                              break;
+                           }
+                           case SNTRuleTypeProcessName: {
+                              ruleType = @"Process Name";
+                              break;
                            }
                            default: ruleType = @"(Unknown type)";
                          }

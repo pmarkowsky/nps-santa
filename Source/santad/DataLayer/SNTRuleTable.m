@@ -370,6 +370,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     if (rule.type == SNTRuleTypeTeamID) {
       return rule;
     }
+
+    rule = staticRules[identifiers.processName];
+    if (rule.type == SNTRuleTypeProcessName) {
+      return rule;
+    }
   }
 
   // Now query the database.
@@ -398,9 +403,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
                          @"OR (identifier=? AND type=1000) "
                          @"OR (identifier=? AND type=2000) "
                          @"OR (identifier=? AND type=3000) "
-                         @"OR (identifier=? AND type=4000) LIMIT 1",
-                         identifiers.cdhash, identifiers.binarySHA256, identifiers.signingID,
-                         identifiers.certificateSHA256, identifiers.teamID];
+                         @"OR (identifier=? AND type=4000) "
+                         @"OR (identifier=? AND type=5000) LIMIT 1",
+                         identifiers.cdhash, identifiers.binarySHA256, 
+                         identifiers.signingID, identifiers.certificateSHA256, 
+                         identifiers.teamID, identifiers.processName];
     if ([rs next]) {
       rule = [self ruleFromResultSet:rs];
     }

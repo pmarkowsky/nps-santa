@@ -228,6 +228,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     type = SNTRuleTypeSigningID;
   } else if ([ruleTypeString isEqual:kRuleTypeCDHash]) {
     type = SNTRuleTypeCDHash;
+  } else if ([ruleTypeString isEqual:kRuleTypeProcessName]) {
+    type = SNTRuleTypeProcessName;
   } else {
     return nil;
   }

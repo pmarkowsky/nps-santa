@@ -82,6 +82,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
       .signingID = signingID,
       .certificateSHA256 = certificateSHA256,
       .teamID = teamID,
+      .processName = cd.processName,
   };
 }
 
@@ -131,6 +132,9 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
           {{SNTRuleTypeTeamID, SNTRuleStateAllow}, SNTEventStateAllowTeamID},
           {{SNTRuleTypeTeamID, SNTRuleStateSilentBlock}, SNTEventStateBlockTeamID},
           {{SNTRuleTypeTeamID, SNTRuleStateBlock}, SNTEventStateBlockTeamID},
+          {{SNTRuleTypeProcessName, SNTRuleStateAllow}, SNTEventStateAllowProcessName},
+          {{SNTRuleTypeProcessName, SNTRuleStateSilentBlock}, SNTEventStateBlockProcessName},
+          {{SNTRuleTypeProcessName, SNTRuleStateBlock}, SNTEventStateBlockProcessName},
       };
 
   auto iterator = decisions.find(std::pair<SNTRuleType, SNTRuleState>{rule.type, rule.state});
@@ -262,6 +266,7 @@ static void UpdateCachedDecisionSigningInfo(
   cd.signingID = signingID;
   cd.signingStatus = signingStatusCallback();
   cd.decisionClientMode = mode;
+  cd.processName = fileInfo.path.lastPathComponent;
   cd.quarantineURL = fileInfo.quarantineDataURL;
 
   NSError *csInfoError;

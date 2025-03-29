@@ -41,6 +41,7 @@
 @property NSString *teamID;
 @property NSString *signingID;
 @property NSString *cdhash;
+@property NSString *processName;
 @property NSDictionary *entitlements;
 @property BOOL entitlementsFiltered;
 @property uint32_t codesigningFlags;

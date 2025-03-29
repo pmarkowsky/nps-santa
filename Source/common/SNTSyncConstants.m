@@ -133,6 +133,7 @@ NSString *const kRuleTypeCertificate = @"CERTIFICATE";
 NSString *const kRuleTypeTeamID = @"TEAMID";
 NSString *const kRuleTypeSigningID = @"SIGNINGID";
 NSString *const kRuleTypeCDHash = @"CDHASH";
+NSString *const kRuleTypeProcessName = @"PROCESSNAME";
 NSString *const kRuleCustomMsg = @"custom_msg";
 NSString *const kRuleCustomURL = @"custom_url";
 NSString *const kRuleComment = @"comment";

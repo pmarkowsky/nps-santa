@@ -31,6 +31,7 @@ struct RuleIdentifiers {
   NSString *signingID;
   NSString *certificateSHA256;
   NSString *teamID;
+  NSString *processName;
 };
 
 @interface SNTRuleIdentifiers : NSObject <NSSecureCoding>
@@ -39,6 +40,7 @@ struct RuleIdentifiers {
 @property(readonly) NSString *signingID;
 @property(readonly) NSString *certificateSHA256;
 @property(readonly) NSString *teamID;
+@property(readonly) NSString *processName;
 
 /// Please use `initWithRuleIdentifiers:`
 - (instancetype)init NS_UNAVAILABLE;
