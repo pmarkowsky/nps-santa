@@ -22,20 +22,30 @@ Create a signing ID rule for `platform:com.apple.spctl` and attach the following
 
 ## Prevent users from enabling remote access via SSH on the command line
 
+**Requires:** Santa 2025.8+
 
-systemsetup can be used to enable Remote Apple Events. Set whether the system responds to events sent by other computers (such as AppleScripts).
+As seen on [Loobins lateral movement section](https://www.loobins.io/binaries/systemsetup/#enable-remote-login)
 
+Users can use `systemsetup` to enable remote access via SSH on the command line.
 
+This can be prevented by creating a signing ID rule for `platform:com.apple.systemsetup` with the following CEL policy
+
+```clike
+args.join(' ').contains("-setremotelogin on")
+```
 
 ## Prevent Users from enabling remote apple events
 
-You can use `systemsetup` can be used to enable Remote Apple Events from other
-computers. This can be blocked with a CEL rule.
+**Requires:** Santa 2025.8+
 
-First set a signing ID `platform:com.apple.systemsetup`
+As seen on [Loobins lateral movement section](https://www.loobins.io/binaries/systemsetup/#enable-remote-apple-events)
+
+Users can use `systemsetup` to enable Remote Apple Events from other
+computers. 
+
+This can be prevented by creating a signing ID rule for
+`platform:com.apple.systemsetup` with the following CEL policy
 
 ```clike
-args.exists(i, args[i] == "-setremotelogin" && 
-             args[i+1:].exists(arg, arg == "on"))
+args.join(' ').contains("-setremoteappleevents on")
 ```
-
