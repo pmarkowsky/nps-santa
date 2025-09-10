@@ -19,3 +19,24 @@ Create a signing ID rule for `platform:com.apple.spctl` and attach the following
 ```clike
 ['--global-disable', '--master-disable','--disable', '--add', '--remove'].exists(flag, flag in args) ? BLOCKLIST : ALLOWLIST
 ```
+
+## Prevent users from enabling SSH (Santa 2025.8+)
+
+As called out in [loobins](https://www.loobins.io/binaries/systemsetup/) the systemsetup command can be used to enable SSH.
+
+To block this create a signing ID rule for `platform:com.apple.systemsetup` and attach the following CEL program:
+
+```clike
+args.join(" ").contains("-setremotelogin on")
+```
+
+## Prevent users from enabling Remote Apple Event (Santa 2025.8+)
+
+As called out in [loobins](https://www.loobins.io/binaries/systemsetup/) the
+systemsetup command can be used to enable Remote Apple Events.
+
+To block this create a signing ID rule for `platform:com.apple.systemsetup` and attach the following CEL program:
+
+```clike
+args.join(" ").contains("-setremoteappleevents on")
+```
