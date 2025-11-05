@@ -100,7 +100,6 @@
       NSURL *newSyncBaseURL = [configurator syncBaseURL];
       BOOL statsCollectionEnabled = [configurator enableStatsCollection];
       BOOL telemetryExportEnabled = [configurator enableTelemetryExport];
-      BOOL enableNATS = [configurator enableNATS];
 
       // If the SyncBaseURL was added or changed, and a connection already
       // exists, it must be bounced.
@@ -116,6 +115,7 @@
 
       BOOL enableAPNS = [configurator enableAPNS];
       BOOL fcmEnabled = [configurator fcmEnabled];
+      BOOL enableNATS = [configurator enableNATS];
 
       // If EnableNATS or EnableAPNS changed and we have an active connection, restart the sync service
       // This ensures the service picks up the new push notification configuration
