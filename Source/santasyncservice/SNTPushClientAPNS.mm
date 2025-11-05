@@ -78,4 +78,14 @@
   [self.delegate pushNotificationSyncSecondsFromNow:0];
 }
 
+- (void)disconnectWithCompletion:(void (^)(void))completion {
+  LOGI(@"Disconnecting APNS push client");
+  // Clear the token to indicate we're disconnected
+  self.token = nil;
+  
+  if (completion) {
+    dispatch_async(dispatch_get_main_queue(), completion);
+  }
+}
+
 @end

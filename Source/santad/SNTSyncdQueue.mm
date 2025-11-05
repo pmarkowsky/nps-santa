@@ -32,6 +32,8 @@
 @property MOLXPCConnection *syncConnection;
 @property dispatch_source_t timer;
 @property NSURL *previousSyncBaseURL;
+@property NSNumber *previousEnableNATS;
+@property NSNumber *previousEnableAPNS;
 @end
 
 @implementation SNTSyncdQueue {
@@ -47,6 +49,20 @@
                                         DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
   }
   return self;
+}
+
+- (void)dealloc {
+  // Cancel any pending timer to prevent handler from executing after deallocation
+  if (self.timer) {
+    dispatch_source_cancel(self.timer);
+    self.timer = NULL;
+  }
+
+  // Clear the invalidation handler to break the retain cycle with the XPC connection
+  if (self.syncConnection) {
+    self.syncConnection.invalidationHandler = nil;
+    self.syncConnection = nil;
+  }
 }
 
 /// On each call to reassessSyncServiceConnection, a timer will be created to
@@ -84,6 +100,7 @@
       NSURL *newSyncBaseURL = [configurator syncBaseURL];
       BOOL statsCollectionEnabled = [configurator enableStatsCollection];
       BOOL telemetryExportEnabled = [configurator enableTelemetryExport];
+      BOOL enableNATS = [configurator enableNATS];
 
       // If the SyncBaseURL was added or changed, and a connection already
       // exists, it must be bounced.
@@ -97,20 +114,62 @@
 
       self.previousSyncBaseURL = newSyncBaseURL;
 
+      BOOL enableAPNS = [configurator enableAPNS];
+      BOOL fcmEnabled = [configurator fcmEnabled];
+
+      // If EnableNATS or EnableAPNS changed and we have an active connection, restart the sync service
+      // This ensures the service picks up the new push notification configuration
+      BOOL natsChanged = self.previousEnableNATS && 
+                         [self.previousEnableNATS boolValue] != enableNATS;
+      BOOL apnsChanged = self.previousEnableAPNS && 
+                         [self.previousEnableAPNS boolValue] != enableAPNS;
+      
+      if ((natsChanged || apnsChanged) && self.syncConnection.isConnected) {
+        LOGI(@"EnableNATS or EnableAPNS changed - restarting sync service");
+        [self tearDownSyncServiceConnectionSerialized];
+        // Update previous values
+        self.previousEnableNATS = @(enableNATS);
+        self.previousEnableAPNS = @(enableAPNS);
+        // Return early. When the sync service spins down, it will trigger the
+        // invalidation handler which will reassess the connection state.
+        return;
+      }
+
+      // Update previous values if they haven't been set yet
+      if (!self.previousEnableNATS) {
+        self.previousEnableNATS = @(enableNATS);
+      }
+      if (!self.previousEnableAPNS) {
+        self.previousEnableAPNS = @(enableAPNS);
+      }
+
+      // If both NATS and APNS are disabled, spin down the sync service
+      // (unless there's a syncBaseURL, stats, telemetry, or FCM that requires it to stay running)
+      BOOL bothNATSAndAPNSDisabled = !enableNATS && !enableAPNS;
+
       // If newSyncBaseURL or statsCollectionEnabled is set, start the sync service
       if (newSyncBaseURL || statsCollectionEnabled || telemetryExportEnabled) {
-        if (!self.syncConnection.isConnected) {
-          [self establishSyncServiceConnectionSerialized];
-        }
+        // If both NATS and APNS are disabled and FCM is not enabled, spin down
+        // (even if there's a syncBaseURL, stats, or telemetry)
+        if (bothNATSAndAPNSDisabled && !fcmEnabled) {
+          if (self.syncConnection.isConnected) {
+            [self tearDownSyncServiceConnectionSerialized];
+          }
+        } else {
+          if (!self.syncConnection.isConnected) {
+            [self establishSyncServiceConnectionSerialized];
+          }
 
-        // Ensure any pending requests to clear sync state are cancelled, but
-        // only if there is a sync base URL set
-        if (newSyncBaseURL) {
-          [NSObject cancelPreviousPerformRequestsWithTarget:[SNTConfigurator configurator]
-                                                   selector:@selector(clearSyncState)
-                                                     object:nil];
+          // Ensure any pending requests to clear sync state are cancelled, but
+          // only if there is a sync base URL set
+          if (newSyncBaseURL) {
+            [NSObject cancelPreviousPerformRequestsWithTarget:[SNTConfigurator configurator]
+                                                     selector:@selector(clearSyncState)
+                                                       object:nil];
+          }
         }
       } else {
+        // No syncBaseURL, stats, or telemetry - spin down
         if (self.syncConnection.isConnected) {
           // Note: Only teardown the connection if we're connected. This helps
           // prevent the condition where we would end-up reestablishing the

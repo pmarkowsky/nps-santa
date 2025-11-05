@@ -748,6 +748,40 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                    faaPolicyProcessor->ModifyRateLimiterSettings(
                                        configurator.fileAccessGlobalLogsPerSec, newWindowSizeSec);
                                  }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(enableNATS)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   BOOL oldBool = [oldValue boolValue];
+                                   BOOL newBool = [newValue boolValue];
+
+                                   if (oldBool == newBool) {
+                                     return;
+                                   }
+
+                                   LOGI(@"EnableNATS changed: %d -> %d", oldBool, newBool);
+
+                                   // reassessSyncServiceConnection will handle disconnecting
+                                   // the NATS client when it's disabled
+                                   [syncd_queue reassessSyncServiceConnection];
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(enableAPNS)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   BOOL oldBool = [oldValue boolValue];
+                                   BOOL newBool = [newValue boolValue];
+
+                                   if (oldBool == newBool) {
+                                     return;
+                                   }
+
+                                   LOGI(@"EnableAPNS changed: %d -> %d", oldBool, newBool);
+
+                                   // reassessSyncServiceConnection will handle disconnecting
+                                   // the APNS client when it's disabled
+                                   [syncd_queue reassessSyncServiceConnection];
+                                 }],
 
   ]];
 

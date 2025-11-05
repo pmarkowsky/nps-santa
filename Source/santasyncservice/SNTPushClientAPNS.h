@@ -18,4 +18,5 @@
 - (instancetype)initWithSyncDelegate:(id<SNTPushNotificationsSyncDelegate>)syncDelegate;
 - (void)APNSTokenChanged;
 - (void)handleAPNSMessage:(NSDictionary *)message;
+- (void)disconnectWithCompletion:(void (^)(void))completion;
 @end
