@@ -114,7 +114,6 @@
       self.previousSyncBaseURL = newSyncBaseURL;
 
       BOOL enableAPNS = [configurator enableAPNS];
-      BOOL fcmEnabled = [configurator fcmEnabled];
       BOOL enableNATS = [configurator enableNATS];
 
       // If EnableNATS or EnableAPNS changed and we have an active connection, restart the sync service
@@ -143,30 +142,18 @@
         self.previousEnableAPNS = @(enableAPNS);
       }
 
-      // If both NATS and APNS are disabled, spin down the sync service
-      // (unless there's a syncBaseURL, stats, telemetry, or FCM that requires it to stay running)
-      BOOL bothNATSAndAPNSDisabled = !enableNATS && !enableAPNS;
-
       // If newSyncBaseURL or statsCollectionEnabled is set, start the sync service
       if (newSyncBaseURL || statsCollectionEnabled || telemetryExportEnabled) {
-        // If both NATS and APNS are disabled and FCM is not enabled, spin down
-        // (even if there's a syncBaseURL, stats, or telemetry)
-        if (bothNATSAndAPNSDisabled && !fcmEnabled) {
-          if (self.syncConnection.isConnected) {
-            [self tearDownSyncServiceConnectionSerialized];
-          }
-        } else {
-          if (!self.syncConnection.isConnected) {
-            [self establishSyncServiceConnectionSerialized];
-          }
+        if (!self.syncConnection.isConnected) {
+          [self establishSyncServiceConnectionSerialized];
+        }
 
-          // Ensure any pending requests to clear sync state are cancelled, but
-          // only if there is a sync base URL set
-          if (newSyncBaseURL) {
-            [NSObject cancelPreviousPerformRequestsWithTarget:[SNTConfigurator configurator]
-                                                     selector:@selector(clearSyncState)
-                                                       object:nil];
-          }
+        // Ensure any pending requests to clear sync state are cancelled, but
+        // only if there is a sync base URL set
+        if (newSyncBaseURL) {
+          [NSObject cancelPreviousPerformRequestsWithTarget:[SNTConfigurator configurator]
+                                                   selector:@selector(clearSyncState)
+                                                     object:nil];
         }
       } else {
         // No syncBaseURL, stats, or telemetry - spin down
