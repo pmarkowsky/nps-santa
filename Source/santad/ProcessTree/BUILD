@@ -48,6 +48,9 @@ objc_library(
 proto_library(
     name = "process_tree_proto",
     srcs = ["process_tree.proto"],
+    deps = [
+        "@protobuf//:timestamp_proto",
+    ],
 )
 
 cc_proto_library(

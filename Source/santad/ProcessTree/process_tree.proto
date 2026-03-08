@@ -2,6 +2,17 @@ syntax = "proto3";
 
 package santa.pb.v1.process_tree;
 
+import "google/protobuf/timestamp.proto";
+
+message AgentSession {
+  string session_id = 1;
+  string session_name = 2;
+  string policy = 3;
+  map<string, string> tags = 4;
+  google.protobuf.Timestamp started_at = 5;
+  string parent_session_id = 6;
+}
+
 message Annotations {
   enum Originator {
     UNSPECIFIED = 0;
@@ -10,4 +21,5 @@ message Annotations {
   }
 
   Originator originator = 1;
+  AgentSession agent_session = 2;
 }

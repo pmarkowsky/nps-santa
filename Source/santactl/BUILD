@@ -87,6 +87,7 @@ objc_library(
 objc_library(
     name = "santactl_lib",
     srcs = [
+        "Commands/SNTCommandAgent.mm",
         "Commands/SNTCommandCheckCache.mm",
         "Commands/SNTCommandDoctor.mm",
         "Commands/SNTCommandEventUpload.mm",

@@ -390,6 +390,7 @@ objc_library(
         "//Source/common/cel:CEL",
         "//Source/santad/ProcessTree:process",
         "//Source/santad/ProcessTree:process_tree",
+        "//Source/santad/ProcessTree/annotations:agent_session",
     ],
 )
 
@@ -1146,6 +1147,7 @@ objc_library(
         "//Source/common:Unit",
         "//Source/common/faa:WatchItems",
         "//Source/santad/ProcessTree:process_tree",
+        "//Source/santad/ProcessTree/annotations:agent_session",
         "//Source/santad/ProcessTree/annotations:originator",
     ],
 )

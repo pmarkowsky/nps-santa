@@ -151,6 +151,14 @@ std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
     return CELValue(cwd_(), arena);
   }
 
+  if (name == "agent_session" && agent_session_) {
+    agent_session_accessed_ = true;
+    auto *proto =
+        google::protobuf::Arena::Create<::santa::pb::v1::process_tree::AgentSession>(arena);
+    proto->CopyFrom(*agent_session_);
+    return cel_runtime::CelProtoWrapper::CreateMessage(proto, arena);
+  }
+
   // Handle the V2 specific fields
   if constexpr (IsV2) {
     if (name == "ancestors") {
@@ -211,12 +219,17 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVari
     v.push_back({field->name(), type});
   }
 
+  // Add agent_session as a top-level variable (optional proto message).
+  v.push_back({"agent_session",
+               ::cel::MessageType(::santa::pb::v1::process_tree::AgentSession::descriptor())});
+
   return v;
 }
 
 template <bool IsV2>
 bool Activation<IsV2>::IsResultCacheable() const {
-  if (args_.HasValue() || envs_.HasValue() || euid_.HasValue() || cwd_.HasValue()) {
+  if (args_.HasValue() || envs_.HasValue() || euid_.HasValue() || cwd_.HasValue() ||
+      agent_session_accessed_) {
     return false;
   }
 

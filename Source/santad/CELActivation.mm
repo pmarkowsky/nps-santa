@@ -27,6 +27,7 @@
 #include "Source/common/cel/Activation.h"
 #include "Source/common/cel/CELProtoTraits.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
+#include "Source/santad/ProcessTree/annotations/agent_session.h"
 #include "Source/santad/ProcessTree/process_tree_macos.h"
 
 namespace {
@@ -117,6 +118,22 @@ ActivationCallbackBlock CreateCELActivationBlock(
             csInfo.secureSigningTime.timeIntervalSince1970);
       }
 
+      // Look up agent_session annotation for the target process.
+      std::optional<::santa::pb::v1::process_tree::AgentSession> agentSession;
+      if (processTree) {
+        auto pid =
+            santa::santad::process_tree::PidFromAuditToken(esMsg->event.exec.target->audit_token);
+        auto proc = processTree->Get(pid);
+        if (proc) {
+          auto annotation =
+              processTree->GetAnnotation<santa::santad::process_tree::AgentSessionAnnotator>(
+                  **proc);
+          if (annotation) {
+            agentSession = (*annotation)->session();
+          }
+        }
+      }
+
       return std::make_unique<santa::cel::Activation<IsV2>>(
           std::move(f),
           ^std::vector<std::string>() {
@@ -135,7 +152,8 @@ ActivationCallbackBlock CreateCELActivationBlock(
           },
           ^std::vector<AncestorT>() {
             return Ancestors<IsV2>(processTree, esMsg);
-          });
+          },
+          std::move(agentSession));
     };
 
     if (useV2) {
