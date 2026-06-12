@@ -734,4 +734,66 @@
   santa::cel::ClearClockOverrideForTesting();
 }
 
+- (void)testOlderThanFunction {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+  using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+  using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
+  using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  auto makeActivation = [](int64_t signingSeconds, bool setSecure) {
+    auto f = std::make_unique<ExecutableFileT>();
+    if (signingSeconds >= 0) f->mutable_signing_time()->set_seconds(signingSeconds);
+    if (setSecure && signingSeconds >= 0) f->mutable_secure_signing_time()->set_seconds(signingSeconds);
+    return std::make_unique<santa::cel::Activation<true>>(
+        std::move(f), ^std::vector<std::string>() { return {}; },
+        ^std::map<std::string, std::string>() { return {}; }, ^uid_t() { return 0; },
+        ^std::string() { return "/"; }, ^std::string() { return "/usr/bin/test"; },
+        ^std::vector<AncestorT>() { return {}; }, ^std::vector<FileDescriptorT>() { return {}; });
+  };
+
+  const int64_t kSigned = 1699999200;
+  const int64_t kNow = kSigned + 40 * 86400;  // 40 days old
+  santa::cel::SetClockOverrideForTesting(absl::FromUnixSeconds(kNow));
+
+  {
+    // 40 days old > 30 days -> older_than true -> BLOCKLIST branch.
+    auto act = makeActivation(kSigned, /*setSecure=*/false);
+    auto result = sut.value()->CompileAndEvaluate(
+        "older_than(target.signing_time, days(30)) ? BLOCKLIST : ALLOWLIST", *act);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
+    }
+  }
+  {
+    // 40 days old is NOT older than 50 days -> false -> ALLOWLIST branch.
+    auto act = makeActivation(kSigned, /*setSecure=*/false);
+    auto result = sut.value()->CompileAndEvaluate(
+        "older_than(target.signing_time, days(50)) ? BLOCKLIST : ALLOWLIST", *act);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    }
+  }
+  {
+    // Unsigned binary: secure_signing_time unset (epoch 0) -> very large age ->
+    // older_than(..., days(30)) is true.
+    auto act = makeActivation(kSigned, /*setSecure=*/false);  // secure_signing_time left unset
+    auto result = sut.value()->CompileAndEvaluate(
+        "older_than(target.secure_signing_time, days(30)) ? BLOCKLIST : ALLOWLIST", *act);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
+    }
+  }
+
+  santa::cel::ClearClockOverrideForTesting();
+}
+
 @end
