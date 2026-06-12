@@ -116,6 +116,16 @@ absl::Status AddAgeCompilerLibrary(::cel::CompilerBuilder& builder) {
 
 absl::Status RegisterAgeFunctions(::google::api::expr::runtime::CelFunctionRegistry* registry,
                                   const ::google::api::expr::runtime::InterpreterOptions& options) {
+  // These are eager (non-lazy, non-contextual) global overloads. If an
+  // expression calls age()/older_than() with a *literal* timestamp argument
+  // (e.g. older_than(timestamp('2020-01-01T00:00:00Z'), days(30))), the call is
+  // fully constant and the compiler's constant-folding pass evaluates it once
+  // at Compile() time: the clock is read then, the verdict is frozen, and the
+  // runtime clock-read flag is never set (so the result is treated as
+  // cacheable). Real rules pass target.signing_time / target.secure_signing_time
+  // — a non-constant field access — so folding does not occur and the runtime
+  // path (clock read + non-cacheable) is taken. Authors should not pass literal
+  // timestamps to these helpers.
   auto& func_registry = registry->InternalGetRegistry();
 
   CEL_RETURN_IF_ERROR((::cel::UnaryFunctionAdapter<absl::Duration, absl::Time>::RegisterGlobalOverload(
