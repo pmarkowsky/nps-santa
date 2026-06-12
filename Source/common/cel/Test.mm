@@ -796,4 +796,71 @@
   santa::cel::ClearClockOverrideForTesting();
 }
 
+- (void)testAgeCacheability {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+  using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+  using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
+  using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  auto makeActivation = []() {
+    auto f = std::make_unique<ExecutableFileT>();
+    f->mutable_signing_time()->set_seconds(1699999200);
+    f->set_is_platform_binary(false);
+    return std::make_unique<santa::cel::Activation<true>>(
+        std::move(f), ^std::vector<std::string>() { return {}; },
+        ^std::map<std::string, std::string>() { return {}; }, ^uid_t() { return 0; },
+        ^std::string() { return "/"; }, ^std::string() { return "/usr/bin/test"; },
+        ^std::vector<AncestorT>() { return {}; }, ^std::vector<FileDescriptorT>() { return {}; });
+  };
+
+  santa::cel::SetClockOverrideForTesting(absl::FromUnixSeconds(1699999200 + 40 * 86400));
+
+  {
+    // older_than reads the clock -> NOT cacheable.
+    auto act = makeActivation();
+    auto result = sut.value()->CompileAndEvaluate(
+        "older_than(target.signing_time, days(30)) ? BLOCKLIST : ALLOWLIST", *act);
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().cacheable, false);
+  }
+  {
+    // age reads the clock -> NOT cacheable.
+    auto act = makeActivation();
+    auto result = sut.value()->CompileAndEvaluate(
+        "age(target.signing_time) > days(30) ? BLOCKLIST : ALLOWLIST", *act);
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().cacheable, false);
+  }
+  {
+    // days() alone never reads the clock -> cacheable.
+    auto act = makeActivation();
+    auto result = sut.value()->CompileAndEvaluate(
+        "days(30) == duration('720h') ? ALLOWLIST : BLOCKLIST", *act);
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().cacheable, true);
+  }
+  {
+    // Static expression -> cacheable (regression guard).
+    auto act = makeActivation();
+    auto result = sut.value()->CompileAndEvaluate("target.is_platform_binary == false", *act);
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().cacheable, true);
+  }
+  {
+    // Short-circuit: older_than is never evaluated, so the clock is never read
+    // -> cacheable.
+    auto act = makeActivation();
+    auto result = sut.value()->CompileAndEvaluate(
+        "(false && older_than(target.signing_time, days(30))) ? BLOCKLIST : ALLOWLIST", *act);
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    XCTAssertEqual(result.value().cacheable, true);
+  }
+
+  santa::cel::ClearClockOverrideForTesting();
+}
+
 @end

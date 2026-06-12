@@ -180,11 +180,16 @@ template <bool IsV2>
 absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Evaluate(
     const ::cel_runtime::CelExpression* expression_plan, const ActivationT& activation,
     google::protobuf::Arena* arena) {
+  santa::cel::ResetClockRead();
   absl::StatusOr<cel_runtime::CelValue> result = expression_plan->Evaluate(activation, arena);
 
   if (!result.ok()) {
     return result.status();
   }
+
+  // A rule that reads the wall clock (age()/older_than()) produces a verdict
+  // that drifts with time, so it must not be cached.
+  const bool cacheable = activation.IsResultCacheable() && !santa::cel::ClockWasRead();
 
   // Check the result type.
   // For V1: A bool value will return ALLOWLIST for true and BLOCKLIST for false.
@@ -193,9 +198,9 @@ absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Eva
   //         both return this type). Bool is also supported for convenience.
   if (bool value; result->GetValue(&value)) {
     if (value) {
-      return EvaluationResultT(Traits::ALLOWLIST, activation.IsResultCacheable());
+      return EvaluationResultT(Traits::ALLOWLIST, cacheable);
     }
-    return EvaluationResultT(Traits::BLOCKLIST, activation.IsResultCacheable());
+    return EvaluationResultT(Traits::BLOCKLIST, cacheable);
   } else if constexpr (IsV2) {
     // V2: Handle Result message
     if (result->IsMessage()) {
@@ -209,7 +214,7 @@ absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Eva
           if (cel_result->has_cooldown_minutes()) {
             cooldownOpt = cel_result->cooldown_minutes();
           }
-          return EvaluationResultT(rv, activation.IsResultCacheable(), cooldownOpt);
+          return EvaluationResultT(rv, cacheable, cooldownOpt);
         }
       }
     }
@@ -218,7 +223,7 @@ absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Eva
     if (int64_t value; result->GetValue(&value)) {
       auto descriptor = Traits::ReturnValue_descriptor();
       if (descriptor->FindValueByNumber((int)value) != nullptr) {
-        return EvaluationResultT(static_cast<ReturnValue>(value), activation.IsResultCacheable());
+        return EvaluationResultT(static_cast<ReturnValue>(value), cacheable);
       }
     }
   }
