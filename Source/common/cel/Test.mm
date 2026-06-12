@@ -669,4 +669,69 @@
   }
 }
 
+- (void)testAgeFunction {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+  using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+  using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
+  using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  // Helper to build an activation for a binary signed at `signingSeconds`.
+  auto makeActivation = [](int64_t signingSeconds) {
+    auto f = std::make_unique<ExecutableFileT>();
+    f->mutable_signing_time()->set_seconds(signingSeconds);
+    return std::make_unique<santa::cel::Activation<true>>(
+        std::move(f), ^std::vector<std::string>() { return {}; },
+        ^std::map<std::string, std::string>() { return {}; }, ^uid_t() { return 0; },
+        ^std::string() { return "/"; }, ^std::string() { return "/usr/bin/test"; },
+        ^std::vector<AncestorT>() { return {}; }, ^std::vector<FileDescriptorT>() { return {}; });
+  };
+
+  // Both values are hour-aligned: 1699999200 and +40 days (3,456,000s = 960h).
+  const int64_t kSigned = 1699999200;
+  const int64_t kNow = kSigned + 40 * 86400;  // exactly 40 days later
+  santa::cel::SetClockOverrideForTesting(absl::FromUnixSeconds(kNow));
+
+  {
+    // age is exactly 40 days == 960h.
+    auto act = makeActivation(kSigned);
+    auto result = sut.value()->CompileAndEvaluate(
+        "age(target.signing_time) == duration('960h') ? ALLOWLIST : BLOCKLIST", *act);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    }
+  }
+  {
+    // Quantization: advancing 'now' by 30 minutes (still in the same hour
+    // bucket) leaves the computed age unchanged at 960h.
+    santa::cel::SetClockOverrideForTesting(absl::FromUnixSeconds(kNow + 1800));
+    auto act = makeActivation(kSigned);
+    auto result = sut.value()->CompileAndEvaluate(
+        "age(target.signing_time) == duration('960h') ? ALLOWLIST : BLOCKLIST", *act);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    }
+    santa::cel::SetClockOverrideForTesting(absl::FromUnixSeconds(kNow));
+  }
+  {
+    // Future signing time clamps to zero age.
+    auto act = makeActivation(kNow + 86400);  // signed 1 day in the "future"
+    auto result = sut.value()->CompileAndEvaluate(
+        "age(target.signing_time) == duration('0') ? ALLOWLIST : BLOCKLIST", *act);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    }
+  }
+
+  santa::cel::ClearClockOverrideForTesting();
+}
+
 @end
