@@ -13,6 +13,7 @@
 /// limitations under the License.
 
 #include "Source/common/cel/Activation.h"
+#include "Source/common/cel/AgeFunction.h"
 #include "Source/common/cel/CELProtoTraits.h"
 #include "Source/common/cel/Evaluator.h"
 
@@ -24,6 +25,7 @@
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/time/time.h"
 #include "google/protobuf/arena.h"
 
 @interface CELTest : XCTestCase
@@ -638,6 +640,33 @@
   auto result =
       sut.value()->CompileAndEvaluate("require_touchid_with_cooldown_minutes(10)", activation);
   XCTAssertFalse(result.ok());
+}
+
+- (void)testDaysFunction {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+  using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+  using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
+  using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
+
+  auto f = std::make_unique<ExecutableFileT>();
+  f->mutable_signing_time()->set_seconds(1699999200);
+  santa::cel::Activation<true> activation(
+      std::move(f), ^std::vector<std::string>() { return {}; },
+      ^std::map<std::string, std::string>() { return {}; }, ^uid_t() { return 0; },
+      ^std::string() { return "/"; }, ^std::string() { return "/usr/bin/test"; },
+      ^std::vector<AncestorT>() { return {}; }, ^std::vector<FileDescriptorT>() { return {}; });
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  // days(30) is 720 hours.
+  auto result = sut.value()->CompileAndEvaluate(
+      "days(30) == duration('720h') ? ALLOWLIST : BLOCKLIST", activation);
+  if (!result.ok()) {
+    XCTFail("Failed to evaluate: %s", result.status().message().data());
+  } else {
+    XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+  }
 }
 
 @end

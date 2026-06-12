@@ -26,11 +26,13 @@ objc_library(
     name = "CEL",
     srcs = [
         "Activation.mm",
+        "AgeFunction.mm",
         "Evaluator.mm",
         "TouchIDFunction.mm",
     ],
     hdrs = [
         "Activation.h",
+        "AgeFunction.h",
         "CELProtoTraits.h",
         "Evaluator.h",
         "TouchIDFunction.h",
@@ -41,6 +43,7 @@ objc_library(
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
         "@cel-cpp//checker:validation_result",
         "@cel-cpp//common:ast_proto",
         "@cel-cpp//common:decl",
@@ -81,6 +84,7 @@ santa_unit_test(
         ":result_cc_proto",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
         "@northpolesec_protos//celv2:v2_cc_proto",
     ],
 )

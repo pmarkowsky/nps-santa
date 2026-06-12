@@ -30,6 +30,7 @@
 #include "parser/parser.h"
 
 #include "Source/common/cel/Activation.h"
+#include "Source/common/cel/AgeFunction.h"
 #include "Source/common/cel/TouchIDFunction.h"
 #include "Source/common/cel/result.pb.h"
 
@@ -63,6 +64,13 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
   // Add TouchID cooldown functions for CELv2 only
   if constexpr (IsV2) {
     if (auto result = santa::cel::AddTouchIDCooldownCompilerLibrary(*builder); !result.ok()) {
+      return result;
+    }
+  }
+
+  // Add relative-age helpers for CELv2 only
+  if constexpr (IsV2) {
+    if (auto result = santa::cel::AddAgeCompilerLibrary(*builder); !result.ok()) {
       return result;
     }
   }
@@ -148,6 +156,14 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::C
   // Register TouchID cooldown functions for CELv2 only
   if constexpr (IsV2) {
     if (auto result = santa::cel::RegisterTouchIDCooldownFunctions(builder->GetRegistry(), options);
+        !result.ok()) {
+      return result;
+    }
+  }
+
+  // Register relative-age functions for CELv2 only
+  if constexpr (IsV2) {
+    if (auto result = santa::cel::RegisterAgeFunctions(builder->GetRegistry(), options);
         !result.ok()) {
       return result;
     }
