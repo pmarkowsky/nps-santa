@@ -38,6 +38,50 @@ target.signing_time >= timestamp('2025-05-31T00:00:00Z')
   `}
 />
 
+## Block apps older than N days <AddedBadge added={"Santa 2026.X"} />
+
+Sometimes you want to block a binary based on how long ago it was signed
+rather than a fixed calendar date. Three helper functions make this easy:
+
+- `age(timestamp) -> duration` — how long ago `timestamp` was, relative to
+  now. Never negative (a future timestamp reports an age of zero).
+- `days(int) -> duration` — `n` days expressed as a duration. CEL duration
+  literals only go up to hours, so `days(30)` is the readable way to write 30
+  days (the raw equivalent is `duration('720h')`).
+- `older_than(timestamp, duration) -> bool` — true when `timestamp` is more
+  than `duration` in the past.
+
+For example, to block Firefox if the running binary was signed more than 30
+days ago, create a `SIGNINGID` rule for `EXAMPLE:org.mozilla.firefox` and
+attach the following CEL program:
+
+```clike
+older_than(target.secure_signing_time, days(30)) ? BLOCKLIST : ALLOWLIST
+```
+
+You can also combine the helpers directly with the signing ID inside a single
+boolean expression:
+
+```clike
+target.signing_id == 'EXAMPLE:org.mozilla.firefox' && older_than(target.secure_signing_time, days(30))
+```
+
+Notes:
+
+- Prefer `secure_signing_time` over `signing_time`. The former is validated
+  against the binary's code signature and cannot be spoofed by simply writing
+  a timestamp into the file.
+- "Now" is quantized to the top of the hour, so a rule that uses these helpers
+  changes its verdict at most once per hour. As a consequence, rules using
+  these helpers are **not** stored in the kernel allow-cache; santad
+  re-evaluates them on every execution. This is by design.
+- An unsigned binary has no signing time. The field is unset and is treated as
+  the Unix epoch, so its computed age is enormous and
+  `older_than(..., days(30))` evaluates to **true** for it. If you do not want
+  unsigned binaries to match, guard the expression with
+  `has(target.secure_signing_time)`, e.g.
+  `has(target.secure_signing_time) && older_than(target.secure_signing_time, days(30))`.
+
 ## Prevent users from disabling gatekeeper
 
 Create a signing ID rule for `platform:com.apple.spctl` and attach the following CEL program
