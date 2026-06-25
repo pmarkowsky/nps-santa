@@ -161,7 +161,7 @@ es_file_t targetFileMatchesAlsoRegex = MakeESFile("/foo/matches_also");
 es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
 - (void)handleMessageShouldLog:(BOOL)shouldLog
-         shouldRemoveFromCache:(BOOL)shouldRemoveFromCache
+             cacheRemovalCount:(int)cacheRemovalCount
                      withBlock:(TestHelperBlock)testBlock
                  telemetryMask:(TelemetryEvent)telemetryMask {
   es_file_t file = MakeESFile("foo");
@@ -182,11 +182,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   auto mockEnricher = std::make_shared<santa::MockEnricher>();
 
   auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
-  if (shouldRemoveFromCache) {
-    EXPECT_CALL(*mockAuthCache, RemoveFromCache).Times(1);
-  } else {
-    EXPECT_CALL(*mockAuthCache, RemoveFromCache).Times(0);
-  }
+  EXPECT_CALL(*mockAuthCache, RemoveFromCache).Times(cacheRemovalCount);
   dispatch_semaphore_t semaMetrics = dispatch_semaphore_create(0);
 
   // NOTE: Currently unable to create a partial mock of the
@@ -242,7 +238,16 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
          shouldRemoveFromCache:(BOOL)shouldRemoveFromCache
                      withBlock:(TestHelperBlock)testBlock {
   [self handleMessageShouldLog:shouldLog
-         shouldRemoveFromCache:shouldRemoveFromCache
+             cacheRemovalCount:shouldRemoveFromCache ? 1 : 0
+                     withBlock:testBlock
+                 telemetryMask:TelemetryEvent::kEverything];
+}
+
+- (void)handleMessageShouldLog:(BOOL)shouldLog
+             cacheRemovalCount:(int)cacheRemovalCount
+                     withBlock:(TestHelperBlock)testBlock {
+  [self handleMessageShouldLog:shouldLog
+             cacheRemovalCount:cacheRemovalCount
                      withBlock:testBlock
                  telemetryMask:TelemetryEvent::kEverything];
 }
@@ -408,7 +413,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   [self handleMessageShouldLog:YES shouldRemoveFromCache:NO withBlock:testBlock];
 
-  // UNLINK, remove from cache, but doesn't match fileChangesRegex
+  // UNLINK, remove target from cache, but doesn't match fileChangesRegex
   testBlock =
       ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
         SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
@@ -424,7 +429,49 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                     }]);
       };
 
-  [self handleMessageShouldLog:NO shouldRemoveFromCache:NO withBlock:testBlock];
+  [self handleMessageShouldLog:NO shouldRemoveFromCache:YES withBlock:testBlock];
+
+  // RENAME to a new path, remove source from cache, but doesn't match fileChangesRegex
+  testBlock =
+      ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+        SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+        __autoreleasing dispatch_semaphore_t* sema,
+        __autoreleasing dispatch_semaphore_t* semaMetrics) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_RENAME;
+        esMsg->event.rename.source = &targetFileMissesRegex;
+        esMsg->event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+        Message msg(mockESApi, esMsg);
+        OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
+        XCTAssertNoThrow([recorderClient handleMessage:Message(mockESApi, esMsg)
+                                    recordEventMetrics:^(EventDisposition d) {
+                                      XCTFail("Metrics record callback should not be called here");
+                                    }]);
+      };
+
+  [self handleMessageShouldLog:NO shouldRemoveFromCache:YES withBlock:testBlock];
+
+  // RENAME over an existing file, remove both source and existing destination from cache
+  testBlock =
+      ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+        SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+        __autoreleasing dispatch_semaphore_t* sema,
+        __autoreleasing dispatch_semaphore_t* semaMetrics) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_RENAME;
+        esMsg->event.rename.source = &targetFileMatchesRegex;
+        esMsg->event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
+        esMsg->event.rename.destination.existing_file = &targetFileMissesRegex;
+        Message msg(mockESApi, esMsg);
+        OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
+        XCTAssertNoThrow([recorderClient handleMessage:Message(mockESApi, esMsg)
+                                    recordEventMetrics:^(EventDisposition d) {
+                                      XCTAssertEqual(d, EventDisposition::kProcessed);
+                                      dispatch_semaphore_signal(*semaMetrics);
+                                    }]);
+        XCTAssertSemaTrue(*semaMetrics, 5, "Metrics not recorded within expected window");
+        XCTAssertSemaTrue(*sema, 5, "Log wasn't called within expected time window");
+      };
+
+  [self handleMessageShouldLog:YES cacheRemovalCount:2 withBlock:testBlock];
 
   // EXCHANGEDATA, Prefix match, bail early
   testBlock =
@@ -496,7 +543,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   // Use a bitmask without EXIT specified
   [self handleMessageShouldLog:NO
-         shouldRemoveFromCache:NO
+             cacheRemovalCount:0
                      withBlock:testBlock
                  telemetryMask:santa::TelemetryConfigToBitmask(@[ @"execution" ])];
 

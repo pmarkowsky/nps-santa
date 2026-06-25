@@ -117,6 +117,21 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
       break;
     }
 
+    case ES_EVENT_TYPE_NOTIFY_UNLINK: {
+      self->_authResultCache->RemoveFromCache(esMsg->event.unlink.target);
+      break;
+    }
+
+    case ES_EVENT_TYPE_NOTIFY_RENAME: {
+      self->_authResultCache->RemoveFromCache(esMsg->event.rename.source);
+      // A rename can clobber an existing file, destroying its inode. Evict any
+      // cached decision for that file so a reused inode can't serve a stale result.
+      if (esMsg->event.rename.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE) {
+        self->_authResultCache->RemoveFromCache(esMsg->event.rename.destination.existing_file);
+      }
+      break;
+    }
+
     default: break;
   }
 
